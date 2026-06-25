@@ -10,8 +10,8 @@ import Toybox.Lang;
 
 class Ben10OmnitrixApp extends Application.AppBase {
 
-    private var _view    as Ben10OmnitrixView;
-    private var _delegate as Ben10InputDelegate;
+    private var _view     as Ben10OmnitrixView?;
+    private var _delegate as Ben10InputDelegate?;
 
     function initialize() {
         AppBase.initialize();
