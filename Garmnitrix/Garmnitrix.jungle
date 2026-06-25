@@ -1,0 +1,15 @@
+# Garmnitrix.jungle — Connect IQ Build Configuration
+# Target: Garmin Forerunner 165 (fr165)
+
+project.manifest = manifest.xml
+
+# Source files
+base.sourcePath = source
+
+# Resources
+base.resourcePath = resources
+
+# Compiler optimisation — minimise heap footprint
+# Memory target: <90KB (all vector, zero large bitmaps)
+fr165.sourcePath = $(base.sourcePath)
+fr165.resourcePath = $(base.resourcePath)

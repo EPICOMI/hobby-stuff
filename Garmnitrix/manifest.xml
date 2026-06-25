@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        entry="Ben10OmnitrixApp"
+        id="a3484182-cd71-4e9c-b4ac-1df3d3b60b8c"
+        launcherIcon="@Drawables.LauncherIcon"
+        minSdkVersion="3.4.0"
+        name="@Strings.AppName"
+        type="watch-app"
+        version="1.0.0">
+        <iq:products>
+            <iq:product id="fr165"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="Toybox.System"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>
