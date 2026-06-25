@@ -2,13 +2,23 @@
 //  Ben10OmnitrixView.mc
 //  Main view — handles all drawing for the Garmnitrix watch app
 //
-//  Hourglass geometry (corrected):
-//    LEFT triangle:  vertical base on LEFT edge of face circle,
-//                    apex pointing RIGHT toward centre
-//    RIGHT triangle: vertical base on RIGHT edge of face circle,
-//                    apex pointing LEFT toward centre
-//    Result: two inward-pointing black wedges from left & right,
-//            leaving the classic Omnitrix hourglass negative space.
+//  Hourglass geometry (Omniverse-accurate, per spec):
+//
+//  Each black wedge subtends exactly 60 degrees at the origin.
+//  Right wedge: 330 deg to 30 deg  (-30 to +30)
+//  Left  wedge: 150 deg to 210 deg
+//
+//  Green windows: 120 deg top (30-150) and bottom (210-330)
+//
+//  Flat neck cut: inner tips truncated at x = +/- 0.1*R_FACE
+//  so the centre has a clean blocky gap of 0.2*R_FACE wide.
+//  Flat tip half-height = 0.05*R_FACE.
+//
+//  Right wedge polygon (mirrored for left):
+//    P1 = outer arc corner at +30 deg  = ( cos30*R,  sin30*R)
+//    P2 = outer arc corner at -30 deg  = ( cos30*R, -sin30*R)
+//    P3 = inner flat tip bottom        = ( 0.1R,    -0.05R )
+//    P4 = inner flat tip top           = ( 0.1R,     0.05R )
 // ============================================================
 
 import Toybox.WatchUi;
@@ -29,7 +39,6 @@ class Ben10OmnitrixView extends WatchUi.View {
     private const CY      as Lang.Number = 195;
     private const R_OUTER as Lang.Number = 185;
     private const R_FACE  as Lang.Number = 130;
-    private const R_INNER as Lang.Number = 118;
 
     private var _aodShiftIndex as Lang.Number = 0;
     private const AOD_OFFSETS as Lang.Array = [
@@ -66,10 +75,8 @@ class Ben10OmnitrixView extends WatchUi.View {
     function onUpdate(dc as Graphics.Dc) as Void {
         var stats   = System.getSystemStats();
         var battery = stats.battery;
-
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
-
         if (isAod) {
             _drawAodOutline(dc, battery);
         } else if (!isTransformMode) {
@@ -102,22 +109,24 @@ class Ben10OmnitrixView extends WatchUi.View {
     }
 
     // ---- IDLE DIAL ------------------------------------------
-    // Hourglass = two black triangles pointing INWARD from LEFT and RIGHT:
+    // Builds two black wedge polygons using the 60-degree spec:
     //
-    //   LEFT triangle:
-    //     base = vertical line at leftEdge (CX - R_INNER)
-    //     top-left corner  = [leftEdge, CY - halfH]
-    //     bot-left corner  = [leftEdge, CY + halfH]
-    //     apex             = [CX - neckGap, CY]   (points RIGHT toward centre)
-    //
-    //   RIGHT triangle (mirror):
-    //     base = vertical line at rightEdge (CX + R_INNER)
-    //     top-right corner = [rightEdge, CY - halfH]
-    //     bot-right corner = [rightEdge, CY + halfH]
-    //     apex             = [CX + neckGap, CY]   (points LEFT toward centre)
+    //  cos(30deg) = 0.866,  sin(30deg) = 0.5
+    //  Using integer math scaled from R_FACE:
+    //    outerX = R_FACE * 866 / 1000
+    //    outerY = R_FACE * 500 / 1000
+    //    neckX  = R_FACE * 100 / 1000   (0.1 R)
+    //    neckY  = R_FACE *  50 / 1000   (0.05R)
     //
     private function _drawIdleDial(dc as Graphics.Dc, battery as Lang.Float) as Void {
         var bColor = calculateBatteryColor(battery);
+        var R = R_FACE;
+
+        // Pre-compute all key coordinates (integer arithmetic only)
+        var outerX = R * 866 / 1000;   // cos30 * R  (~112)
+        var outerY = R * 500 / 1000;   // sin30 * R  (~65)
+        var neckX  = R * 100 / 1000;   // 0.1R       (~13)
+        var neckY  = R *  50 / 1000;   // 0.05R      (~6)
 
         // Outer ring
         dc.setColor(bColor, Graphics.COLOR_TRANSPARENT);
@@ -128,45 +137,42 @@ class Ben10OmnitrixView extends WatchUi.View {
 
         // Solid face circle
         dc.setColor(bColor, bColor);
-        dc.fillCircle(CX, CY, R_FACE);
-
-        // Hourglass wedge geometry
-        var leftEdge  = CX - R_INNER;          // x of left base
-        var rightEdge = CX + R_INNER;          // x of right base
-        var halfH     = R_INNER * 90 / 100;    // half-height of base (~106px)
-        var neckGap   = 4;                     // gap between apexes at centre
+        dc.fillCircle(CX, CY, R);
 
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
 
-        // LEFT wedge: base on left, apex points right
-        var leftTri = [
-            [leftEdge, CY - halfH],
-            [leftEdge, CY + halfH],
-            [CX - neckGap, CY]
+        // RIGHT wedge: spans -30 to +30 degrees
+        //   P1 = outer corner at +30 deg = (+outerX, +outerY)  [bottom-right]
+        //   P2 = outer corner at -30 deg = (+outerX, -outerY)  [top-right]
+        //   P3 = inner flat tip top      = (+neckX,  -neckY)
+        //   P4 = inner flat tip bottom   = (+neckX,  +neckY)
+        var rightWedge = [
+            [CX + outerX, CY + outerY],
+            [CX + outerX, CY - outerY],
+            [CX + neckX,  CY - neckY],
+            [CX + neckX,  CY + neckY]
         ];
-        dc.fillPolygon(leftTri);
+        dc.fillPolygon(rightWedge);
 
-        // RIGHT wedge: base on right, apex points left
-        var rightTri = [
-            [rightEdge, CY - halfH],
-            [rightEdge, CY + halfH],
-            [CX + neckGap, CY]
+        // LEFT wedge: spans 150 to 210 degrees (mirror of right)
+        //   P1 = outer corner at 210 deg = (-outerX, +outerY)
+        //   P2 = outer corner at 150 deg = (-outerX, -outerY)
+        //   P3 = inner flat tip top      = (-neckX,  -neckY)
+        //   P4 = inner flat tip bottom   = (-neckX,  +neckY)
+        var leftWedge = [
+            [CX - outerX, CY + outerY],
+            [CX - outerX, CY - outerY],
+            [CX - neckX,  CY - neckY],
+            [CX - neckX,  CY + neckY]
         ];
-        dc.fillPolygon(rightTri);
-
-        // Corner-softening circles at each base corner
-        // Rounds off the sharp triangle corners against the green face
-        dc.fillCircle(leftEdge  + 10, CY - halfH + 10, 16);
-        dc.fillCircle(leftEdge  + 10, CY + halfH - 10, 16);
-        dc.fillCircle(rightEdge - 10, CY - halfH + 10, 16);
-        dc.fillCircle(rightEdge - 10, CY + halfH - 10, 16);
+        dc.fillPolygon(leftWedge);
     }
 
     private function _drawBezelDetails(dc as Graphics.Dc, color as Lang.Number) as Void {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(1);
-        // Tick marks at top, bottom, left, right (0, 90, 180, 270 degrees)
-        var angles = [270, 90, 180, 0];
+        // Tick marks at 0, 90, 180, 270 (right, bottom, left, top)
+        var angles = [0, 90, 180, 270];
         for (var i = 0; i < 4; i++) {
             var deg = (angles[i] as Lang.Number).toFloat();
             var rad = deg * 3.14159f / 180.0f;
@@ -182,7 +188,6 @@ class Ben10OmnitrixView extends WatchUi.View {
     private function _drawInvisibleClock(dc as Graphics.Dc) as Void {
         var now     = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var timeStr = now.hour.format("%02d") + ":" + now.min.format("%02d");
-        // Neon green text on neon green fill = invisible to user
         dc.setColor(0x3BFF00, 0x3BFF00);
         dc.drawText(CX, CY, Graphics.FONT_LARGE, timeStr,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -194,14 +199,11 @@ class Ben10OmnitrixView extends WatchUi.View {
 
         dc.setColor(GRAY, GRAY);
         dc.fillCircle(CX, CY, 172);
-
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.fillCircle(CX, CY, 158);
-
         dc.setColor(GRAY, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(3);
         dc.drawCircle(CX, CY, 182);
-
         dc.setColor(GRAY, GRAY);
         dc.fillCircle(CX,       CY - 185, 8);
         dc.fillCircle(CX,       CY + 185, 8);
@@ -249,25 +251,28 @@ class Ben10OmnitrixView extends WatchUi.View {
 
         var ccx = CX + ox;
         var ccy = CY + oy;
+        var R   = R_FACE;
+
+        var outerX = R * 866 / 1000;
+        var outerY = R * 500 / 1000;
+        var neckX  = R * 100 / 1000;
+        var neckY  = R *  50 / 1000;
 
         dc.setColor(bColor, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(1);
         dc.drawCircle(ccx, ccy, R_OUTER);
 
-        var leftEdge  = ccx - R_INNER;
-        var rightEdge = ccx + R_INNER;
-        var halfH     = R_INNER * 90 / 100;
-        var neck      = 4;
+        // Right wedge outline
+        dc.drawLine(ccx + outerX, ccy - outerY, ccx + outerX, ccy + outerY);
+        dc.drawLine(ccx + outerX, ccy - outerY, ccx + neckX,  ccy - neckY);
+        dc.drawLine(ccx + neckX,  ccy - neckY,  ccx + neckX,  ccy + neckY);
+        dc.drawLine(ccx + neckX,  ccy + neckY,  ccx + outerX, ccy + outerY);
 
         // Left wedge outline
-        dc.drawLine(leftEdge, ccy - halfH, leftEdge,   ccy + halfH);
-        dc.drawLine(leftEdge, ccy - halfH, ccx - neck, ccy);
-        dc.drawLine(leftEdge, ccy + halfH, ccx - neck, ccy);
-
-        // Right wedge outline
-        dc.drawLine(rightEdge, ccy - halfH, rightEdge,  ccy + halfH);
-        dc.drawLine(rightEdge, ccy - halfH, ccx + neck, ccy);
-        dc.drawLine(rightEdge, ccy + halfH, ccx + neck, ccy);
+        dc.drawLine(ccx - outerX, ccy - outerY, ccx - outerX, ccy + outerY);
+        dc.drawLine(ccx - outerX, ccy - outerY, ccx - neckX,  ccy - neckY);
+        dc.drawLine(ccx - neckX,  ccy - neckY,  ccx - neckX,  ccy + neckY);
+        dc.drawLine(ccx - neckX,  ccy + neckY,  ccx - outerX, ccy + outerY);
     }
 
     function enterTransformMode() as Void {
