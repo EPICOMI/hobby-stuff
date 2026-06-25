@@ -11,9 +11,6 @@
         <iq:products>
             <iq:product id="fr165"/>
         </iq:products>
-        <iq:permissions>
-            <iq:uses-permission id="Toybox.System"/>
-        </iq:permissions>
         <iq:languages>
             <iq:language>eng</iq:language>
         </iq:languages>
