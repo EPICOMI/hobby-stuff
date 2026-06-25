@@ -1,0 +1,14 @@
+step 1:
+connectiq
+
+step 2:
+monkeyc -o Garmnitrix.prg -f Garmnitrix.jungle -y "C:\path\tp\developer\developer_key" -d fr165 -w
+
+step 3:
+monkeydo Garmnitrix.prg fr165
+
+---
+all in powershell
+replace files in Garmnitrix folder in Downloads with latest GitHub version.
+replace the launcher_icon.png with the photo in Downloads with the same name.
+then run the above steps
